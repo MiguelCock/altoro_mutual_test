@@ -1,5 +1,9 @@
 # altoro_mutual_test
 
+***Testers:***
+- Laura Danniela Zarate Guerrero
+- Miguel Angel Cock Cano
+
 ## EXEL LINK
 
 https://1drv.ms/x/c/980a678827ce5c88/EWfM-PfNH_1IqPPBNCKRaf4BgO-GvHXeTOF3uGBOqSfH4w?e=IvMECK
@@ -173,19 +177,35 @@ Proof in the browser:
 
 ![alt text](image-7.png)
 
-Request successful developer tools:
+Request successful shown in developer tools:
 
 ![alt text](image-8.png)
 
+#### FIX:
 
+To solve the issue change the code from line 94 to 96 of the file [LoginServlet.java](https://github.com/HCL-TECH-SOFTWARE/AltoroJ/blob/AltoroJ-3.2/src/com/ibm/security/appscan/altoromutual/servlet/LoginServlet.java) with the following, making request from other sites not posible.
+
+~~~JAVA
+Cookie accountCookie = ServletUtil.establishSession(username, session);
+
+// The normal API does not support SameSite, so build manually:
+String cookieValue = accountCookie.getName() + "=" + accountCookie.getValue()
+        + "; Path=" + accountCookie.getPath()
+        + "; HttpOnly"
+        + "; Secure"
+        + "; SameSite=Lax";
+
+response.setHeader("Set-Cookie", cookieValue);
+response.sendRedirect(request.getContextPath() + "/bank/main.jsp");
+~~~
 
 ---
 
 ### 4.3.1
 
-The following workflow show how they is not multifactor authentication for accessing the admin panel
+The following workflow show how there is not multifactor authentication for accessing the admin panel
 
-1. Admin login
+1. Normal login (Since it is the same with admin login)
 
 ![alt text](image-9.png)
 
@@ -197,10 +217,103 @@ The following workflow show how they is not multifactor authentication for acces
 
 ![alt text](image-11.png)
 
+#### FIX:
+
+To solve the issue we will implement a simple version MFA creating a code in the back and asking the user to input it in the front, if you are an admin that has access to the backend you will be able to see the code and input it in the front. This will be more of a proof of concept since the implementation of it would add new concerns to the application.
+
+In the [LoginServlet.java](https://github.com/HCL-TECH-SOFTWARE/AltoroJ/blob/AltoroJ-3.2/src/com/ibm/security/appscan/altoromutual/servlet/LoginServlet.java) file add the following code in lines 94 to 96 so when the admin logs in, it gets redirected to the mfa page and the mfa code gets created, this will collide with the last point, so take care implementing both:
+
+~~~ JAVA
+Cookie accountCookie = ServletUtil.establishSession(username,session);
+response.addCookie(accountCookie);
+
+if (username.equals("admin")) {
+    // Generate 6-digit MFA code
+    int mfaCode = (int)(Math.random() * 900000) + 100000;
+    session.setAttribute("mfa_code", mfaCode);
+
+    // For class/demo – display in console
+    System.out.println("MFA code for admin: " + mfaCode);
+
+    // Redirect to MFA page instead of admin panel
+    response.sendRedirect("admin/mfa.jsp");
+    return;
+}
+
+response.sendRedirect(request.getContextPath()+"/bank/main.jsp");
+~~~
+
+To add the mfa page, add this file to the [admin](https://github.com/HCL-TECH-SOFTWARE/AltoroJ/tree/AltoroJ-3.2/WebContent/admin) folder, naming it ***mfa.jsp***
+
+<html>
+<head><title>MFA Verification</title></head>
+<body>
+<h2>Multi-Factor Authentication</h2>
+<p>A 6-digit verification code has been generated. Enter it below.</p>
+
+<form method="POST" action="VerifyMFA">
+    <input type="text" name="code" maxlength="6" />
+    <input type="submit" value="Verify" />
+</form>
+
+</body>
+</html>
+
+And to confirm the code, add the following file naming it ***VerifyMFAServlet.java*** to the [servlet](https://github.com/HCL-TECH-SOFTWARE/AltoroJ/tree/AltoroJ-3.2/src/com/ibm/security/appscan/altoromutual/servlet) folder.
+
+~~~JAVA
+package com.ibm.security.appscan.altoromutual.servlet;
+
+import java.io.IOException;
+import javax.servlet.*;
+import javax.servlet.http.*;
+
+public class VerifyMFAServlet extends HttpServlet {
+
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+        throws ServletException, IOException {
+
+        HttpSession session = request.getSession(false);
+
+        if (session == null) {
+            response.sendRedirect("login.jsp");
+            return;
+        }
+
+        String input = request.getParameter("code");
+        Object stored = session.getAttribute("mfa_code");
+
+        if (stored != null && input.equals(String.valueOf(stored))) {
+            session.setAttribute("mfa_passed", true);
+            session.removeAttribute("mfa_code");
+            response.sendRedirect("bank/admin.jsp");
+        } else {
+            session.setAttribute("error", "Invalid verification code.");
+            response.sendRedirect("mfa.jsp");
+        }
+    }
+}
+~~~
+
+And lastly protect the admin panel adding this code at the start of [admin.jsp](https://github.com/HCL-TECH-SOFTWARE/AltoroJ/blob/AltoroJ-3.2/WebContent/admin/admin.jsp) in the third line.
+
+~~~JSP
+<%
+if (session.getAttribute("mfa_passed") == null) {
+    response.sendRedirect("../mfa.jsp");
+    return;
+}
+%>
+~~~
+
+
 ### 4.3.3
 
-This one gets invalidated because of points 4.1.1, 4.1.2 and 4.3.1 since there are no checks for actions
+This one gets invalidated because of points 4.1.1, 4.1.2 and 4.3.1 since there are no checks for actions.
 
+#### FIX:
+
+since this problem happens becauses of the previus points, the solution of them apply to this one as well.
 
 ## Communication Security
 
