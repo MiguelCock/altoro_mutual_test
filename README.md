@@ -321,18 +321,165 @@ since this problem happens becauses of the previus points, the solution of them 
 
 ### 9.1.1
 
-### 9.1.2
+All request can are done with HTTP here is an example of it:
 
-### 9.1.3
+![alt text](image-12.png)
+
+#### FIX:
+
+To solve the issue the app must implement a certificate and add the following filter to the [filter](https://github.com/HCL-TECH-SOFTWARE/AltoroJ/tree/AltoroJ-3.2/src/com/ibm/security/appscan/altoromutual/filter)s folder.
+
+~~~java
+package com.ibm.security.appscan.altoromutual.filter;
+
+import java.io.IOException;
+import javax.servlet.*;
+import javax.servlet.http.*;
+
+public class HttpsEnforceFilter implements Filter {
+
+    @Override
+    public void init(FilterConfig filterConfig) throws ServletException {}
+
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+            throws IOException, ServletException {
+
+        HttpServletRequest req = (HttpServletRequest) request;
+        HttpServletResponse res = (HttpServletResponse) response;
+
+        if (!req.isSecure()) {
+            String httpsURL =
+                "https://" + req.getServerName() +
+                req.getRequestURI() +
+                (req.getQueryString() != null ? "?" + req.getQueryString() : "");
+            res.sendRedirect(httpsURL);
+            return;
+        }
+
+        chain.doFilter(request, response);
+    }
+
+    @Override
+    public void destroy() {}
+}
+~~~
 
 ---
 
-### 9.2.1
+### 9.2.1 - 9.2.5
 
-### 9.2.2
+Since the app doesnt have a certificate all of this points are invalid, thus to fix it we will need to add a certifiacte to the aplication.
 
-### 9.2.3
+#### FIX:
 
-### 9.2.4
+AltoroJ is a **Java EE webapp running on Apache Tomcat**, and **TLS/HTTPS is *not configured inside the application code***.
+**You do NOT add the certificate in the GitHub repo.**
+You configure HTTPS **in the application server (Tomcat)**.
 
-### 9.2.5
+AltoroJ's repo **does NOT contain any HTTPS/TLS configuration**, because it’s intentionally insecure.
+So you will fix this by configuring TLS in Tomcat's `server.xml`.
+
+---
+
+# ✅ **Where to add the certificate for AltoroJ**
+
+AltoroJ is deployed as a `.war` to **Apache Tomcat**, so TLS must be added in:
+
+```
+<tomcat>/conf/server.xml
+```
+
+You need to add a **Connector** with HTTPS enabled.
+
+---
+
+# ✅ **Step-by-step: Add HTTPS to Tomcat for AltoroJ**
+
+### **1. Generate a keystore with a self-signed certificate**
+
+For testing:
+
+```bash
+keytool -genkeypair -alias altoroj \
+  -keyalg RSA -keysize 2048 \
+  -keystore altoroj-keystore.jks \
+  -validity 365
+```
+
+You’ll be asked for password + certificate details.
+
+Move the keystore into Tomcat, e.g.:
+
+```
+/opt/tomcat/conf/altoroj-keystore.jks
+```
+
+---
+
+### **2. Edit Tomcat’s server.xml**
+
+Open:
+
+```
+<tomcat>/conf/server.xml
+```
+
+Find the HTTP connector (e.g. port 8080) — leave it as is.
+
+Add **this HTTPS connector** below it:
+
+```xml
+<Connector 
+    protocol="org.apache.coyote.http11.Http11NioProtocol"
+    port="8443" 
+    maxThreads="150"
+    SSLEnabled="true"
+    scheme="https" 
+    secure="true"
+    clientAuth="false"
+    sslProtocol="TLS"
+    keystoreFile="conf/altoroj-keystore.jks"
+    keystorePass="YOUR_PASSWORD_HERE"
+/>
+```
+
+This exposes AltoroJ at:
+
+```
+https://localhost:8443/AltoroJ/
+```
+
+---
+
+# ✅ **3. (Optional) Enforce HTTPS Only**
+
+To satisfy:
+
+> “Verify that TLS is used for all client connectivity, and does not fall back to HTTP”
+
+You can force HTTP→HTTPS redirection via:
+
+### **Option 1 — Web.xml**
+
+Add a security constraint:
+
+```xml
+<security-constraint>
+    <web-resource-collection>
+        <web-resource-name>Entire Application</web-resource-name>
+        <url-pattern>/*</url-pattern>
+    </web-resource-collection>
+    <user-data-constraint>
+        <transport-guarantee>CONFIDENTIAL</transport-guarantee>
+    </user-data-constraint>
+</security-constraint>
+```
+
+### **Option 2 — Tomcat redirect**
+
+Add this HTTP connector:
+
+```xml
+<Connector port="8080" redirectPort="8443" />
+```
