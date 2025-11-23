@@ -11,8 +11,29 @@ https://1drv.ms/x/c/980a678827ce5c88/EWfM-PfNH_1IqPPBNCKRaf4BgO-GvHXeTOF3uGBOqSf
 ## Authentication
 
 ### 2.1.1
+Server returning a success message (200 OK) even though the normalized password length is below 12 characters.
+
+Request:
+![alt text](image-100.png)
+
+200 OK Response:
+![alt text](image-101.png)
+
+#### FIX:
+
 
 ### 2.1.2
+Server returning a 302 Found Messsage when the password lenght is more than 64 characters but also when the password lenght is way above 128 characters.
+
+64 Characters Response:
+![alt text](image-102.png)
+
+128 Characters Response:
+![alt text](image-103.png)
+
+#### FIX:
+
+
 
 ### 2.1.3
 
