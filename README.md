@@ -245,6 +245,7 @@ response.sendRedirect(request.getContextPath()+"/bank/main.jsp");
 
 To add the mfa page, add this file to the [admin](https://github.com/HCL-TECH-SOFTWARE/AltoroJ/tree/AltoroJ-3.2/WebContent/admin) folder, naming it ***mfa.jsp***
 
+~~~html
 <html>
 <head><title>MFA Verification</title></head>
 <body>
@@ -258,6 +259,7 @@ To add the mfa page, add this file to the [admin](https://github.com/HCL-TECH-SO
 
 </body>
 </html>
+~~~
 
 And to confirm the code, add the following file naming it ***VerifyMFAServlet.java*** to the [servlet](https://github.com/HCL-TECH-SOFTWARE/AltoroJ/tree/AltoroJ-3.2/src/com/ibm/security/appscan/altoromutual/servlet) folder.
 
