@@ -269,6 +269,53 @@ setx APP_PEPPER "VerySecretRandomKeyValue_GenerateThis"
 
 Use a long random key (32+ characters).
 
+---
+
+### 2.5.4
+
+There are several share accounts harcoded in to the application.
+
+![alt text](image-14.png)
+
+#### FIX:
+
+To remediate this the solution is as simple as deleting lines 160-165 from the [DBUtil.java](https://github.com/HCL-TECH-SOFTWARE/AltoroJ/blob/AltoroJ-3.2/src/com/ibm/security/appscan/altoromutual/util/DBUtil.java) file.
+
+### 2.5.5
+
+The app does not implement a way to notify users if their password has been change.
+
+#### FIX:
+
+To notify users we will add this function to the [DBUtil.java](https://github.com/HCL-TECH-SOFTWARE/AltoroJ/blob/AltoroJ-3.2/src/com/ibm/security/appscan/altoromutual/util/DBUtil.java) file and call it in the middle of line 506 and 507 so the notification is sent after the password is change and the function is done.
+
+~~~JAVA
+public static void sendSecurityNotification(String username) {
+    try {
+        Connection connection = getConnection();
+        PreparedStatement stmt = connection.prepareStatement(
+            "SELECT EMAIL FROM PEOPLE WHERE USER_ID = ?"
+        );
+        stmt.setString(1, username);
+
+        ResultSet rs = stmt.executeQuery();
+
+        if (rs.next()) {
+            String email = rs.getString("EMAIL");
+
+            EmailService.send(
+                email,
+                "Security Alert: Authentication Factor Changed",
+                "Your password or other authentication factor was changed.\n\n" +
+                "If you did NOT request this change, contact the bank immediately."
+            );
+        }
+    } catch (Exception e) {
+        System.err.println("Failed to send notification: " + e);
+    }
+}
+~~~
+
 
 ## Access Control
 
@@ -506,7 +553,6 @@ if (session.getAttribute("mfa_passed") == null) {
 }
 %>
 ~~~
-
 
 ### 4.3.3
 
