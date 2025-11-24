@@ -165,18 +165,180 @@ password = password.trim().toLowerCase();
 ---
 
 ### 2.2.1
+The screenshot shows a Burp Suite Intruder attack sending 300 login requests against the same user account with different passwords. All requests receive normal application responses with no lockout, CAPTCHA, delay, or error indicating rate limiting. This demonstrates that there are no effective anti-automation controls in place to mitigate credential stuffing, brute force, or excessive failed login attempts, and more than 100 failed attempts per hour are clearly possible on a single account.
 
-### 2.2.2
+![alt text](image-105.png)
 
-### 2.2.3
+#### FIX:
+The application currently allows unlimited failed login attempts against the same user, as demonstrated by a Burp Intruder attack with 300 sequential password guesses and no lockout or rate limiting. To mitigate credential stuffing and brute force attacks and comply with the requirement of no more than 100 failed attempts per hour on a single account, the login flow was updated to include server-side anti-automation controls. The LoginServlet now tracks failed login attempts per username and IP address in a time window and enforces a hard limit on the number of failures allowed per hour. Once the threshold is exceeded, further login attempts for that combination are rejected with a generic error message until the window expires. This rate-limiting behavior significantly reduces the feasibility of large-scale brute force and credential testing attacks against individual accounts.
+
+At the top of LoginServlet (inside the class, near serialVersionUID), added:
+~~~java
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class LoginServlet extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+
+    // Anti-automation / rate limiting
+    private static final int MAX_FAILED_ATTEMPTS_PER_HOUR = 100;
+    private static final long WINDOW_MS = 60L * 60L * 1000L;
+
+    private static final Map<String, FailedLoginWindow> failedLogins =
+            new ConcurrentHashMap<String, FailedLoginWindow>();
+
+    private static class FailedLoginWindow {
+        int count;
+        long windowStartMs;
+    }
+~~~
+
+Still inside the class:
+~~~java
+    private String buildKey(String username, String ip) {
+        if (username == null) {
+            username = "";
+        }
+        if (ip == null) {
+            ip = "";
+        }
+        return username + "|" + ip;
+    }
+
+    private boolean isLockedOut(String username, String ip) {
+        String key = buildKey(username, ip);
+        FailedLoginWindow info = failedLogins.get(key);
+        long now = System.currentTimeMillis();
+
+        if (info == null) {
+            return false;
+        }
+
+        if (now - info.windowStartMs > WINDOW_MS) {
+            info.count = 0;
+            info.windowStartMs = now;
+            return false;
+        }
+
+        // Locked out if we already hit the max in the current window
+        return info.count >= MAX_FAILED_ATTEMPTS_PER_HOUR;
+    }
+
+    private void recordFailedAttempt(String username, String ip) {
+        String key = buildKey(username, ip);
+        long now = System.currentTimeMillis();
+
+        FailedLoginWindow info = failedLogins.get(key);
+        if (info == null) {
+            info = new FailedLoginWindow();
+            info.windowStartMs = now;
+            info.count = 1;
+            failedLogins.put(key, info);
+            return;
+        }
+
+        // If window expired
+        if (now - info.windowStartMs > WINDOW_MS) {
+            info.windowStartMs = now;
+            info.count = 1;
+        } else {
+            info.count++;
+        }
+    }
+
+    private void resetFailedAttempts(String username, String ip) {
+        String key = buildKey(username, ip);
+        failedLogins.remove(key);
+    }
+~~~
+
+In doPost, after reading the username and before DBUtil.isValidUser(...),this checked it's added:
+~~~java
+protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    // log in
+    HttpSession session = request.getSession(true);
+
+    String username = null;
+
+    try {
+        username = request.getParameter("uid");
+        if (username != null)
+            username = username.trim().toLowerCase();
+
+        // --- Anti-automation: lockout check ---
+        String clientIp = request.getRemoteAddr();
+        if (isLockedOut(username, clientIp)) {
+            throw new Exception(
+                "Login Failed: Too many incorrect attempts. Please try again later or contact support."
+            );
+        }
+
+        String password = request.getParameter("passw");
+        String normalizedPassword = DBUtil.normalizePassword(password);
+
+        if (!DBUtil.isValidUser(username, normalizedPassword)){
+            // Record failed attempt
+            recordFailedAttempt(username, clientIp);
+
+            Log4AltoroJ.getInstance().logError("Login failed >>> User: " + username + " >>> Password: " + normalizedPassword);
+            throw new Exception("Login Failed: We're sorry, but this username or password was not found in our system. Please try again.");
+        }
+
+        // If we reach here, login succeeded and reset failed attempts
+        resetFailedAttempts(username, clientIp);
+
+    } catch (Exception ex) {
+        request.getSession(true).setAttribute("loginError", ex.getLocalizedMessage());
+        response.sendRedirect("login.jsp");
+        return;
+    }
+
+    // Existing cookie/session logic stays the same
+    try {
+        Cookie accountCookie = ServletUtil.establishSession(username,session);
+        response.addCookie(accountCookie);
+        response.sendRedirect(request.getContextPath()+"/bank/main.jsp");
+    }
+    catch (Exception ex){
+        ex.printStackTrace();
+        response.sendError(500);
+    }
+}
+~~~
 
 ### 2.2.4
+The screenshot shows the standard login page (WebContent/login.jsp) of the Altoro Mutual application, where users (including the admin account) authenticate using only a username and password. There is no second factor, prompt for a hardware security key, or client-side certificate request. After entering valid credentials, the user is taken directly to their account or the admin panel, proving that no phishing-resistant multi-factor authentication or cryptographic device is in use.
+![alt text](image-100.png)
+![alt text](image-105.png)
 
-### 2.2.5
+#### FIX:
+
+In a real-world environment, this should be implemented in a more robust and secure way, but as a first step toward that goal it would be good to do the implementation of the point 4.3.1.
+
 
 ### 2.2.6
+Screenshot showing the same /login POST request being replayed multiple times with identical credentials, each time receiving a successful response (302 redirect to /bank/main.jsp or similar). This demonstrates that the application relies only on static passwords and does not use OTPs, cryptographic authenticators, or lookup codes to provide replay resistance: any captured login request can be replayed to gain access.
+
+Requests:
+![alt text](image-106.png)
+
+Responses:
+![alt text](image-107.png)
+
+#### FIX:
+
+In a real-world environment, this should be implemented in a more robust and secure way, but as a first step toward that goal it would be good to do the implementation of the point 4.3.1.
+
 
 ### 2.2.7
+A screenshot of login.jsp showing the standard login form (User ID + Password) with no OTP field, no hardware key prompt, and no second-step confirmation. After submitting valid admin credentials, the user is taken directly to the admin panel, proving that intent to authenticate is not verified beyond entering a static password.
+
+![alt text](image-100.png)
+![alt text](image-101.png)
+
+#### FIX:
+
+In a real-world environment, this should be implemented in a more robust and secure way, but as a first step toward that goal it would be good to do the implementation of the point 4.3.1.
 
 ---
 
