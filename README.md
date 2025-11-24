@@ -192,23 +192,94 @@ if (!DBUtil.isValidUser(username, normalizedPassword)) {
 
 ---
 
-### 2.3.1
+### 2.4.1 - 2.4.5
 
-### 2.3.2
+As seen in the code when a new user is created the password is saved directly as plain text:
 
-### 2.3.3
+![alt text](image-13.png)
 
----
+#### FIX:
 
-### 2.4.1
+To solve the issues it is going to be nesessary to encrypt the passwords with an strong hashing function, when saved in the DB and us a tool to create a salt for it.
 
-### 2.4.2
+Below is a **complete, correct, ASVS-compliant fix** for `addUser` and `addSpecialUser` using:
 
-### 2.4.3
+**Step 1 — Add BCrypt dependency**
 
-### 2.4.4
+**Step 2 — Add a method for hashing passwords with pepper**
 
-### 2.4.5
+Place this in `DBUtil.java` or a new class like `SecurityUtil.java`:
+
+```java
+public static String hashPassword(String password) {
+    // Load pepper from environment variable
+    String pepper = System.getenv("APP_PEPPER");
+    if (pepper == null) {
+        throw new RuntimeException("Missing APP_PEPPER environment variable");
+    }
+
+    // Apply pepper
+    String pepperedPassword = password + pepper;
+
+    // bcrypt automatically generates salt internally
+    int workload = 12; // cost factor
+    return BCrypt.hashpw(pepperedPassword, BCrypt.gensalt(workload));
+}
+```
+
+**Step 3 — Fix addUser and addSpecialUser**
+
+~~~java
+public static String addSpecialUser(String username, String password, String firstname, String lastname) {
+		try {
+			Connection connection = getConnection();
+
+            //use the new password hasher
+            String hashedPassword = hashPassword(password);
+
+			Statement statement = connection.createStatement();
+			statement.execute("INSERT INTO SPECIAL_CUSTOMERS (USER_ID,PASSWORD,FIRST_NAME,LAST_NAME,ROLE) VALUES ('"+username+"','"+hashedPassword+"', '"+firstname+"', '"+lastname+"','user')");
+			return null;
+		} catch (SQLException e){
+			return e.toString();
+			
+		}
+	}
+	
+	public static String addUser(String username, String password, String firstname, String lastname) {
+		try {
+			Connection connection = getConnection();
+
+            //use the new password hasher
+            String hashedPassword = hashPassword(password);
+
+			Statement statement = connection.createStatement();
+			statement.execute("INSERT INTO PEOPLE (USER_ID,PASSWORD,FIRST_NAME,LAST_NAME,ROLE) VALUES ('"+username+"','"+hashedPassword+"', '"+firstname+"', '"+lastname+"','user')");
+			return null;
+		} catch (SQLException e){
+			return e.toString();
+			
+		}
+	}
+~~~
+
+**Step 4 — Add Pepper**
+
+In your system:
+
+Linux/macOS:
+
+```bash
+export APP_PEPPER="VerySecretRandomKeyValue_GenerateThis"
+```
+
+Windows PowerShell:
+
+```powershell
+setx APP_PEPPER "VerySecretRandomKeyValue_GenerateThis"
+```
+
+Use a long random key (32+ characters).
 
 
 ## Access Control
