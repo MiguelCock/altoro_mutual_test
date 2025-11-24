@@ -153,26 +153,14 @@ if (!DBUtil.isValidUser(username, normalizedPassword)) {
 ~~~
 
 ### 2.1.4
+It is implemented only partially, so it is not valid, because in the code at:
+src/com/ibm/security/appscan/altoromutual/servlet/LoginServlet.java on lines 79 and 80 you have:
 
-### 2.1.5
+This means it only strips spaces and converts the password to lowercase, but any other character can still be entered.
 ~~~java
+String password = request.getParameter("passw");
+password = password.trim().toLowerCase();
 ~~~
-### 2.1.6
-~~~java
-~~~
-### 2.1.7
-~~~java
-~~~
-### 2.1.8
-~~~java
-~~~
-### 2.1.9
-
-### 2.1.10
-
-### 2.1.11
-
-### 2.1.12
 
 ---
 
