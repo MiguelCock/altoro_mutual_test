@@ -581,7 +581,7 @@ So you will fix this by configuring TLS in Tomcat's `server.xml`.
 
 ---
 
-# ✅ **Where to add the certificate for AltoroJ**
+**Where to add the certificate for AltoroJ**
 
 AltoroJ is deployed as a `.war` to **Apache Tomcat**, so TLS must be added in:
 
@@ -593,7 +593,7 @@ You need to add a **Connector** with HTTPS enabled.
 
 ---
 
-# ✅ **Step-by-step: Add HTTPS to Tomcat for AltoroJ**
+**Step-by-step: Add HTTPS to Tomcat for AltoroJ**
 
 ### **1. Generate a keystore with a self-signed certificate**
 
@@ -651,7 +651,7 @@ https://localhost:8443/AltoroJ/
 
 ---
 
-# ✅ **3. (Optional) Enforce HTTPS Only**
+**3. (Optional) Enforce HTTPS Only**
 
 To satisfy:
 
