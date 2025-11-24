@@ -73,14 +73,6 @@ Server returning a 302 Found Messsage when the password lenght is more than 64 c
 
 ---
 
-### 2.3.1
-
-### 2.3.2
-
-### 2.3.3
-
----
-
 ### 2.4.1 - 2.4.5
 
 As seen in the code when a new user is created the password is saved directly as plain text:
