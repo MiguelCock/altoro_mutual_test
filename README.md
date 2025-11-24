@@ -85,7 +85,7 @@ In the original repo, the DB column is:
 ~~~java
 statement.execute("CREATE TABLE PEOPLE (USER_ID VARCHAR(50) NOT NULL, PASSWORD VARCHAR(20) NOT NULL, FIRST_NAME VARCHAR(100) NOT NULL, LAST_NAME VARCHAR(100) NOT NULL, ROLE VARCHAR(50) NOT NULL, PRIMARY KEY (USER_ID))");
 ~~~
-Because PASSWORD is VARCHAR(20), any password longer than 20 characters would be silently truncated by the database.![alt text](image-13.png)
+Because PASSWORD is VARCHAR(20), any password longer than 20 characters would be silently truncated by the database.
 
 ![alt text](image-104.png)
 
