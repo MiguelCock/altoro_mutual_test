@@ -317,8 +317,28 @@ In a real-world environment, this should be implemented in a more robust and sec
 
 
 ### 2.2.6
+Screenshot showing the same /login POST request being replayed multiple times with identical credentials, each time receiving a successful response (302 redirect to /bank/main.jsp or similar). This demonstrates that the application relies only on static passwords and does not use OTPs, cryptographic authenticators, or lookup codes to provide replay resistance: any captured login request can be replayed to gain access.
+
+Requests:
+![alt text](image-106.png)
+
+Responses:
+![alt text](image-107.png)
+
+#### FIX:
+
+In a real-world environment, this should be implemented in a more robust and secure way, but as a first step toward that goal it would be good to do the implementation of the point 4.3.1.
+
 
 ### 2.2.7
+A screenshot of login.jsp showing the standard login form (User ID + Password) with no OTP field, no hardware key prompt, and no second-step confirmation. After submitting valid admin credentials, the user is taken directly to the admin panel, proving that intent to authenticate is not verified beyond entering a static password.
+
+![alt text](image-100.png)
+![alt text](image-101.png)
+
+#### FIX:
+
+In a real-world environment, this should be implemented in a more robust and secure way, but as a first step toward that goal it would be good to do the implementation of the point 4.3.1.
 
 ---
 
