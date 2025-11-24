@@ -20,7 +20,24 @@ Request:
 ![alt text](image-101.png)
 
 #### FIX:
+In DBUtil.java in the beggining.
+Introduce a centralized password policy check in DBUtil. The new helper methods normalizePassword and validatePasswordMinLength first collapse multiple consecutive spaces into a single space and then verify that the resulting password is at least 12 characters long. Both addUser and changePassword now call this validation before writing to the database, returning a clear error message if the policy is not met.
 
+~~~java
+    private static final int PASSWORD_MIN_LENGTH = 12;
+
+    /**
+     * Validate the minimum password length requirement after normalization.
+     * Returns null if valid, or an error message if invalid.
+     */
+    public static String validatePasswordMinLength(String rawPassword) {
+        String normalized = normalizePassword(rawPassword);
+        if (normalized == null || normalized.length() < PASSWORD_MIN_LENGTH) {
+            return "Password must be at least " + PASSWORD_MIN_LENGTH + " characters long.";
+        }
+        return null;
+    }
+~~~
 
 ### 2.1.2
 Server returning a 302 Found Messsage when the password lenght is more than 64 characters but also when the password lenght is way above 128 characters.
@@ -32,21 +49,123 @@ Server returning a 302 Found Messsage when the password lenght is more than 64 c
 ![alt text](image-103.png)
 
 #### FIX:
+In DBUtil.java at the beggining.
+The PEOPLE.PASSWORD column was updated to VARCHAR(128) so that long passwords up to 128 characters can be stored without truncation. In addition, the centralized password policy method was extended to check the normalized password length and return an error if it exceeds 128 characters. Both user creation and password change flows now invoke this policy before persisting the password, ensuring that passwords of at least 64 characters are accepted while passwords longer than 128 characters are consistently rejected.
 
+Fist, statement.execute changed to:
+~~~java
+statement.execute("CREATE TABLE PEOPLE (USER_ID VARCHAR(50) NOT NULL, PASSWORD VARCHAR(128) NOT NULL, FIRST_NAME VARCHAR(100) NOT NULL, LAST_NAME VARCHAR(100) NOT NULL, ROLE VARCHAR(50) NOT NULL, PRIMARY KEY (USER_ID))");
+~~~
+ Then it's nedeed to put a maximun lenght in the password:
+ ~~~java
+private static final int PASSWORD_MAX_LENGTH = 128;
+~~~
 
+Lastly, in the helper created for the last vulnerability:
+~~~java
+public static String validatePasswordPolicy(String rawPassword) {
+    String normalized = normalizePassword(rawPassword);
+
+    if (normalized == null || normalized.length() < PASSWORD_MIN_LENGTH) {
+        return "Password must be at least " + PASSWORD_MIN_LENGTH + " characters long.";
+    }
+
+    // Adding this:
+    if (normalized.length() > PASSWORD_MAX_LENGTH) {
+        return "Password must not be longer than " + PASSWORD_MAX_LENGTH + " characters.";
+    }
+
+    return null;
+}
+
+~~~
 
 ### 2.1.3
+In the original repo, the DB column is:
+~~~java
+statement.execute("CREATE TABLE PEOPLE (USER_ID VARCHAR(50) NOT NULL, PASSWORD VARCHAR(20) NOT NULL, FIRST_NAME VARCHAR(100) NOT NULL, LAST_NAME VARCHAR(100) NOT NULL, ROLE VARCHAR(50) NOT NULL, PRIMARY KEY (USER_ID))");
+~~~
+Because PASSWORD is VARCHAR(20), any password longer than 20 characters would be silently truncated by the database.![alt text](image-13.png)
+
+![alt text](image-104.png)
+
+
+#### FIX:
+In DBUtil.java in the beggining.
+The PEOPLE.PASSWORD column was increased to VARCHAR(128) to prevent database-level truncation. A centralized normalizePassword function was introduced to collapse only multiple consecutive spaces into a single space, without trimming or altering any other characters. 
+
+~~~java
+    /**
+     * Normalize the password by collapsing multiple consecutive spaces into one.
+     */
+    public static String normalizePassword(String rawPassword) {
+        if (rawPassword == null) {
+            return null;
+        }
+        // Replace runs of 2 or more spaces with a single space
+        return rawPassword.replaceAll(" {2,}", " ");
+    }
+~~~    
+
+Now, when storing passwords:
+~~~java
+public static String addUser(String username, String password, String firstname, String lastname) {
+    try {
+        String normalizedPassword = normalizePassword(password);
+        // ... (your length / breach checks here, if any)
+        Connection connection = getConnection();
+        Statement statement = connection.createStatement();
+        statement.execute(
+          "INSERT INTO PEOPLE (USER_ID,PASSWORD,FIRST_NAME,LAST_NAME,ROLE) " +
+          "VALUES ('"+username+"','"+normalizedPassword+"', '"+firstname+"', '"+lastname+"','user')"
+        );
+        return null;
+    } catch (SQLException e){
+        return e.toString();
+    }
+}
+~~~
+~~~java
+public static String changePassword(String username, String newPassword) {
+    try {
+        String normalizedPassword = normalizePassword(newPassword);
+        // ... (length / breach checks here)
+        Connection connection = getConnection();
+        Statement statement = connection.createStatement();
+        statement.execute(
+          "UPDATE PEOPLE SET PASSWORD = '"+ normalizedPassword +"' WHERE USER_ID = '"+username+"'"
+        );
+        return null;
+    } catch (SQLException e){
+        return e.toString();
+    }
+}
+~~~
+
+Lastly, when logging in in LogginServlet.Post we changed:
+~~~java
+String password = request.getParameter("passw");
+String normalizedPassword = DBUtil.normalizePassword(password);
+
+if (!DBUtil.isValidUser(username, normalizedPassword)) {
+    // This space is simply to handle login error
+}
+~~~
 
 ### 2.1.4
 
 ### 2.1.5
-
+~~~java
+~~~
 ### 2.1.6
-
+~~~java
+~~~
 ### 2.1.7
-
+~~~java
+~~~
 ### 2.1.8
-
+~~~java
+~~~
 ### 2.1.9
 
 ### 2.1.10
